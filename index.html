@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>王熙鳳協理寧國府：文字冒險遊戲</title>
+    <!-- 載入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 使用思源宋體或類似的古典字體 */
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&display=swap');
+        body {
+            font-family: 'Noto Serif TC', serif;
+            background-color: #F8F8F8; /* 淺灰色背景 */
+        }
+        .container-bg {
+            /* 模擬古典木紋或絲綢背景 */
+            background: linear-gradient(145deg, #fefefe, #f4f4f4);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+        .text-scroll {
+            max-height: 25vh; /* 調整高度以容納對話區 */
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: #880000 #f1f1f1;
+        }
+        .text-scroll::-webkit-scrollbar {
+            width: 8px;
+        }
+        .text-scroll::-webkit-scrollbar-thumb {
+            background-color: #c90000;
+            border-radius: 10px;
+        }
+        .choice-btn {
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        .choice-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(169, 13, 13, 0.4);
+        }
+        .scene-image {
+            border: 4px solid #8B0000; /* 紅樓夢主題色 */
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            width: 100%; 
+            height: auto;
+            object-fit: cover;
+        }
+        /* 新增對話區樣式 */
+        .dialogue-box {
+            background-color: #FFF7ED; /* 淺橘/黃色背景，類似信紙 */
+            border-left: 5px solid #A52A2A;
+            color: #4B0000; /* 深紅色文字 */
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 min-h-screen flex items-center justify-center">
+
+    <div id="game-container" class="w-full max-w-4xl container-bg p-6 md:p-10 rounded-xl border border-gray-200">
+        
+        <header class="text-center mb-6">
+            <h1 class="text-3xl md:text-4xl font-bold text-[#8B0000]">協理寧國府：鳳姐立威錄</h1>
+            <p class="text-lg text-gray-600 mt-1">扮演王熙鳳，打贏這場權力之戰。</p>
+            <hr class="mt-4 border-[#C90000]">
+        </header>
+
+        <!-- 狀態面板 -->
+        <div id="status-panel" class="mb-6 grid grid-cols-2 md:grid-cols-4 gap-3 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+            <!-- 狀態將由 JS 填充 -->
+        </div>
+
+        <!-- 故事與決策面板 -->
+        <main>
+            <!-- 故事圖片區域 -->
+            <div class="mb-6 rounded-lg overflow-hidden">
+                <!-- 預設圖片將在 S1_Start 載入時被替換 -->
+                <img id="scene-image" src="" alt="場景插圖" class="scene-image rounded-lg">
+            </div>
+
+            <!-- 對話/心聲區塊 -->
+            <div id="dialogue-text" class="dialogue-box p-4 rounded-r-lg mb-4 text-base md:text-lg italic hidden">
+                <!-- 對話將由 JS 填充 -->
+            </div>
+
+            <!-- 故事文字區域 (主敘事) -->
+            <div id="narrative-text" class="text-scroll p-4 bg-white border border-gray-300 rounded-lg mb-6 text-gray-800 text-base md:text-lg leading-relaxed">
+                <!-- 初始文字 -->
+                <p>載入中...</p>
+            </div>
+
+            <!-- 決策按鈕區域 -->
+            <div id="choices-container" class="flex flex-col space-y-3">
+                <!-- 按鈕將由 JS 填充 -->
+            </div>
+
+            <!-- 重新開始按鈕 (結局時顯示) -->
+            <button id="restart-btn" onclick="startGame()" class="mt-6 w-full py-3 bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-700 hidden choice-btn">
+                重新開始遊戲
+            </button>
+        </main>
+    </div>
+
+    <script>
+        // DOM 元素引用
+        const statusPanel = document.getElementById('status-panel');
+        const dialogueText = document.getElementById('dialogue-text'); 
+        const narrativeText = document.getElementById('narrative-text'); 
+        const choicesContainer = document.getElementById('choices-container');
+        const restartBtn = document.getElementById('restart-btn');
+        const sceneImage = document.getElementById('scene-image'); 
+
+        // 遊戲狀態
+        let gameState = {};
+
+        // ------------------------------------
+        // 核心邏輯函數
+        // ------------------------------------
+
+        /**
+         * 初始化或重置遊戲狀態
+         */
+        function initializeGameState() {
+            gameState = {
+                // 聲望
+                reputation: {
+                    威懾力: 50,
+                    賈珍滿意度: 60,
+                    榮府評價: 70,
+                },
+                // 資源
+                resources: {
+                    府庫銀兩: 1000, // 初始撥款
+                    個人財富: 0,
+                    時間: 45, // 喪事總天數
+                },
+                // 特殊狀態
+                status: {
+                    寧府把柄: 0,
+                    當前場景: 'S1_Start',
+                }
+            };
+        }
+
+        /**
+         * 更新並渲染狀態面板
+         */
+        function updateStatus() {
+            statusPanel.innerHTML = '';
+            
+            // 定義顯示順序、顏色和紅樓夢風格的圖標
+            const statusOrder = [
+                { key: '威懾力', label: '威懾力', icon: '👑', color: 'text-red-700', group: 'reputation' },
+                { key: '賈珍滿意度', label: '賈珍滿意度', icon: '🎭', color: 'text-yellow-600', group: 'reputation' },
+                { key: '榮府評價', label: '榮府評價', icon: '📜', color: 'text-green-700', group: 'reputation' },
+                { key: '府庫銀兩', label: '府庫銀兩 (兩)', icon: '🏛️', color: 'text-blue-700', group: 'resources' },
+                { key: '個人財富', label: '個人財富 (兩)', icon: '🪙', color: 'text-purple-700', group: 'resources' },
+                { key: '時間', label: '剩餘時間 (日)', icon: '⏳', color: 'text-indigo-700', group: 'resources' },
+                { key: '寧府把柄', label: '寧府把柄 (個)', icon: '🗝️', color: 'text-gray-700', group: 'status' },
+            ];
+
+            statusOrder.forEach(item => {
+                let value = gameState[item.group][item.key];
+                
+                if (item.key === '府庫銀兩' || item.key === '個人財富') {
+                    value = Math.max(0, value).toFixed(0); // 確保不顯示負數，並顯示為整數
+                }
+
+                statusPanel.innerHTML += `
+                    <div class="p-2 bg-white rounded-md border border-gray-100">
+                        <!-- 在標籤前加上圖標 -->
+                        <p class="text-xs font-semibold text-gray-500">${item.icon} ${item.label}</p>
+                        <p class="text-xl font-bold ${item.color}">${value}</p>
+                    </div>
+                `;
+            });
+        }
+
+        /**
+         * 載入指定場景並更新介面
+         * @param {string} sceneId - 場景ID
+         */
+        function loadScene(sceneId) {
+            const scene = scenes[sceneId];
+            if (!scene) {
+                narrativeText.innerHTML = '<p class="text-red-500">遊戲錯誤：場景不存在。</p>';
+                choicesContainer.innerHTML = '';
+                return;
+            }
+
+            gameState.status.當前場景 = sceneId;
+            // 處理圖片更新，使用 S1_Start 的圖片作為預設圖片
+            sceneImage.src = scene.image || scenes.S1_Start.image; 
+
+            // 獲取場景的敘事和對話內容
+            const content = getSceneContent(sceneId); 
+
+            // 填充敘事區
+            narrativeText.innerHTML = `<p>${content.narrative.replace(/\n/g, '</p><p>')}</p>`;
+
+            // 填充對話區，如果沒有內容則隱藏
+            if (content.dialogue && content.dialogue.trim() !== '') {
+                dialogueText.innerHTML = `<p>${content.dialogue.replace(/\n/g, '</p><p>')}</p>`;
+                dialogueText.classList.remove('hidden');
+            } else {
+                dialogueText.innerHTML = '';
+                dialogueText.classList.add('hidden');
+            }
+
+            choicesContainer.innerHTML = '';
+            restartBtn.classList.add('hidden');
+
+            const currentChoices = getSceneChoices(sceneId);
+
+            if (currentChoices && currentChoices.length > 0) {
+                currentChoices.forEach((choice, index) => {
+                    const button = document.createElement('button');
+                    button.textContent = choice.label;
+                    button.onclick = () => handleChoice(choice);
+                    button.className = 'choice-btn py-3 px-4 bg-[#A52A2A] text-white font-semibold rounded-lg shadow-md hover:bg-[#8B0000] transition duration-200 ease-in-out';
+                    choicesContainer.appendChild(button);
+                });
+            } else {
+                // 結局處理
+                restartBtn.classList.remove('hidden');
+            }
+
+            // 滾動到文本底部
+            narrativeText.scrollTop = narrativeText.scrollHeight;
+            updateStatus();
+        }
+
+        /**
+         * 處理玩家選擇並推進場景
+         * @param {Object} choice - 選擇物件
+         */
+        function handleChoice(choice) {
+            // 應用狀態變化
+            for (const group in choice.effects) {
+                for (const key in choice.effects[group]) {
+                    if (gameState[group] && gameState[group][key] !== undefined) {
+                        // 特殊處理 S6 獅子大開口 的財富計算
+                        if (choice.nextScene === 'E3_Ultimate_Power' && key === '個人財富') {
+                             const baseReward = 300;
+                             // 如果有把柄，則勒索成功，額外獲得 300 兩
+                             const extortion = gameState.status.寧府把柄 > 0 ? 300 : 0; 
+                             const leftover = gameState.resources.府庫銀兩; // 私吞結餘
+                             gameState.resources.個人財富 = baseReward + extortion + leftover;
+                             gameState.resources.府庫銀兩 = 0; // 結算府庫
+                             break; // 跳出內層循環，避免後續府庫銀兩計算影響
+                        }
+                        
+                        // 處理正常的狀態變化
+                        gameState[group][key] += choice.effects[group][key];
+                    }
+                }
+            }
+
+            // 處理 S6 的結算 (見好就收, 暗中抽取)
+            if (choice.nextScene === 'E1_Good_Reputation' || choice.nextScene === 'E2_Great_Profit') {
+                if (choice.effects.resources.府庫銀兩 < 0) {
+                    // 如果是交還/留下府庫銀兩，則將府庫銀兩設為0
+                    gameState.resources.府庫銀兩 = 0;
+                }
+            }
+
+            // 載入下一個場景
+            loadScene(choice.nextScene);
+        }
+
+        // ------------------------------------
+        // 動態內容生成
+        // ------------------------------------
+
+        /**
+         * 根據當前狀態動態生成選擇按鈕 (尤其針對 S6)
+         */
+        function getSceneChoices(sceneId) {
+            if (sceneId === 'S6_Final_Payoff') {
+                const currentBalance = gameState.resources.府庫銀兩.toFixed(0);
+                
+                return [
+                    {
+                        label: `【見好就收】接受三百兩，並將所有結餘銀兩（${currentBalance} 兩）全數交還給賈珍。`,
+                        nextScene: 'E1_Good_Reputation',
+                        effects: {
+                            reputation: { 榮府評價: 10, 賈珍滿意度: 10 },
+                            resources: { 個人財富: 300,府庫銀兩: -currentBalance }, // 府庫清空
+                        }
+                    },
+                    {
+                        label: `【暗中抽取】接受三百兩，並將結餘銀兩（${currentBalance} 兩）私下留下，帳面上說剛好結平。`,
+                        nextScene: 'E2_Great_Profit',
+                        effects: {
+                            reputation: { 榮府評價: 0, 賈珍滿意度: 0 },
+                            resources: { 個人財富: 300 + parseInt(currentBalance), 府庫銀兩: -currentBalance }, // 府庫清空
+                        }
+                    },
+                    {
+                        label: '【獅子大開口】暗示把柄（需有把柄），要求三百兩之外，再額外索取三百兩「封口費」，並私下留下結餘。',
+                        nextScene: 'E3_Ultimate_Power',
+                        effects: {
+                            reputation: { 榮府評價: -10 },
+                            resources: { 個人財富: 0 }, // 零值只是為了觸發 S6 的特殊計算邏輯
+                        }
+                    },
+                ];
+            }
+            return scenes[sceneId].choices;
+        }
+
+        /**
+         * 根據當前狀態動態生成敘事和對話內容 (針對結局 S6, E2, E3)
+         */
+        function getSceneContent(sceneId) {
+            const scene = scenes[sceneId];
+            
+            // --- 動態結局 E2, E3 ---
+            if (sceneId === 'E2_Great_Profit') {
+                // 修正：將錯誤的字符 'богатства' 替換為 '財富'
+                const finalWealth = gameState.resources.個人財富.toFixed(0);
+                return {
+                    narrative: `您巧妙地在賬面上做了手腳，將結餘銀兩與三百兩報酬一併私吞。當您將一份完美平衡的賬目交給賈珍時，他只看到體面和效率，對細節毫無察覺。這筆**隱藏的財富**讓您的私人金庫瞬間暴漲。您知道，這一舉動雖冒著極大的風險，但您對自己的賬房能力有絕對的自信。從此，您不僅是榮國府的管家，更是**賈府暗中的富豪**。您用這筆銀子可以打點人情、收買消息，甚至在未來的危機中為自己留一條後路。您成功地將公事變成了私利，將寧國府的混亂變成了您個人的**財富盛宴**。這筆財富將成為您日後在家族中施展手腕的堅實後盾。`,
+                    dialogue: `**王熙鳳（總結與分析）：** 「哈哈，這才是管家的高明處！辦事要辦得漂亮，斂財更要斂得乾淨！賈珍那種粗心鬼，連賬目都不敢細看，這筆銀子就當是我給自己的額外嘉獎。雖然有一絲風險，但只要我能壓得住，這就是**生財有道**。用別人的錢，來充實自己的腰包，這筆買賣，賺得值！」\n\n**個人總財富：** ${finalWealth}兩`
+                };
+            }
+            if (sceneId === 'E3_Ultimate_Power') {
+                const extortionSuccess = gameState.status.寧府把柄 > 0;
+                const finalWealth = gameState.resources.個人財富.toFixed(0);
+
+                if (extortionSuccess) {
+                    // 成功勒索：使用 E3 預設圖片
+                    sceneImage.src = scenes.E3_Ultimate_Power.image;
+                    return {
+                        narrative: `您暗示了賈珍的把柄，成功勒索了額外的三百兩「封口費」，並私藏了結餘。賈珍在您的威脅下，臉色鐵青，他深知您掌握的秘密足以讓寧國府萬劫不復。他不得不屈服，對您所說的「賬目結平」表示默認。您帶著豐厚的銀兩和壓倒性的勝利回到了榮府。從此，賈珍在您面前幾乎是俯首帖耳，寧國府對您更是唯命從。然而，這種權力是用**恐懼和怨恨**鑄成的。您贏得了眼前的一切，卻失去了整個寧國府的善意。您清楚，您已成為賈珍眼中唯一的**仇敵**。`,
+                        dialogue: `**賈珍（咬牙切齒）：** 「妳贏了！這次的錢，我認栽！但妳記住，這恩怨，我賈珍記下了！」\n\n**王熙鳳（總結與分析）：** 「有把柄不用，簡直是暴殄天物！這三百兩封口費和全部結餘，都是我應得的。**賈珍**恨我又如何？他不敢動我分毫，這就是權勢！只是，這路走得太絕，日後寧府若有翻身之日，必將視我為頭號大敵。不過，只要我權勢不倒，他永遠只能在背後詛咒。這是**權力極致**的風險與回報！」\n\n**個人總財富：** ${finalWealth}兩`,
+                    };
+                } else {
+                    // 失敗拒絕：動態替換為用戶要求的新圖片
+                    sceneImage.src = 'https://i.postimg.cc/NfnRrfnM/dreamina-2025-10-04-5086.jpg';
+                    return {
+                        narrative: `您的索求讓賈珍極度不滿，他冷笑拒絕，態度強硬。他看穿了您沒有實質把柄，只是虛張聲勢。您的貪婪不僅未能讓您多得一分錢，反而讓您在賈珍心目中留下了一個**貪得無厭**的印象。他雖然仍要感謝您的辦事效率，但對您的不滿已深植心底。您這次的行動被視為**越界**，威懾力下降，日後在兩府之間的周旋將更加困難，且榮府的評價也因為您的名聲受損而降低。您只得三百兩報酬，且給自己埋下了深深的隱患。`,
+                        dialogue: `**賈珍（冷笑）：** 「二奶奶說笑了，喪事辦得辛苦，可這額外的銀子，實在是沒有這規矩！」\n\n**王熙鳳（總結與分析）：** 「失算！沒有實質的把柄，貪心就是莽撞。我鳳姐竟被賈珍這個窩囊廢反將了一軍！只得了這三百兩辛苦錢，還落了個壞名聲。這就是**賭徒的失敗**，以後行事必須更謹慎。下次出手，必得一擊致命，絕不能給人留下嘲笑的餘地。」\n\n**個人總財富：** 300兩`,
+                    };
+                }
+            }
+            
+            // --- 靜態場景 S1-S6, E1 ---
+            return {
+                narrative: scene.narrative,
+                dialogue: scene.dialogue
+            };
+        }
+
+        // ------------------------------------
+        // 場景資料定義 (靜態部分 - 使用 narrative 和 dialogue)
+        // ------------------------------------
+
+        const scenes = {
+            'S1_Start': {
+                narrative: '您，榮國府的璉二奶奶王熙鳳，奉老太太和太太之命，以貴冑媳婦之身，協理寧國府秦可卿的喪事。您跨入寧府大門，便見下人無序、規矩渙散、偷懶成風。偌大的府邸，卻處處透著一股敗落與混亂之氣。您心知，這不僅是一場喪事，更是您展現權柄、為榮府立威的絕佳機會。您決定從整頓紀律、立下最嚴苛的規矩開始，向所有人宣告您的鐵腕。這四十五天的時限，您要辦得風光體面，更要為自己尋得實惠。',
+                dialogue: '**王熙鳳（內心）：** 「呵，都說寧國府是個泥潭，我倒要看看這泥潭能把我鳳辣子怎麼辦！這裏就是個放爛的花園子，如今讓我來治，我要將一兩銀子當十兩花，既要辦得體面，也得讓我的私房進帳。看我如何點石成金，殺雞儆猴，讓這些刁奴賤婢知道誰才是當家的！」',
+                // S1 圖片
+                image: 'https://i.postimg.cc/fLc2T0Wv/dreamina-2025-10-03-2575.jpg',
+                choices: [{
+                    label: '進入第一章：初立威',
+                    nextScene: 'S2_Punishment',
+                    effects: {}
+                }]
+            },
+            'S2_Punishment': {
+                narrative: '臘月的天氣透著寒意，今天是您協理寧府的第一日。您身著半舊衣裳，端坐在儀門旁，神色冷峻。您召集了所有管事、媳婦在儀門點卯。約定的卯正（清晨六點）已過，現場卻只有小貓兩三隻，稀稀拉拉，毫無敬畏之心。場中靜得只聽見風吹樹葉的聲音，所有人都屏住呼吸，等著您發作。正當您眉頭緊鎖，打算點名重罰時，忽然聽聞角門處傳來急促的腳步聲。管家來升的媳婦，渾身是汗，一路小跑，在點名截止前的最後一刻跪倒在地。',
+                dialogue: '**王熙鳳（心聲）：** 「這就是寧國府的規矩？太不像話！來得正好，拿妳來立威。我若不雷霆手段，日後如何管得了這些眼高手低的刁奴？現在不給妳們一個下馬威，寧國府的爛帳永遠理不清，我這個管家就成了個笑話！我倒要看看誰敢替她求情！」',
+                // S2 圖片
+                image: 'https://i.postimg.cc/TwV7YW25/dreamina-2025-10-03-2402.jpg',
+                choices: [
+                    {
+                        label: '【嚴懲立威】立即大聲斥責，下令掌嘴二十，並將她趕出本次工作團隊。',
+                        nextScene: 'S3_Embezzlement_Pre',
+                        effects: { reputation: { 威懾力: 15, 賈珍滿意度: -5 }, resources: { 時間: -3 } }
+                    },
+                    {
+                        label: '【財物懲罰】批評其失職，罰她一個月月錢（20兩銀子），但不影響工作。',
+                        nextScene: 'S3_Embezzlement_Pre',
+                        effects: { reputation: { 威懾力: 5, 賈珍滿意度: 0 }, resources: { 府庫銀兩: 20, 時間: -1 } }
+                    },
+                    {
+                        label: '【口頭警告】輕輕放過，只給予口頭警告，強調「下不為例」。',
+                        nextScene: 'S3_Embezzlement_Pre',
+                        effects: { reputation: { 威懾力: -10, 榮府評價: -5 }, resources: { 時間: -1 } }
+                    },
+                ]
+            },
+            'S3_Embezzlement_Pre': {
+                narrative: '在您施展威懾之後，下人們在外表上不敢再有明顯的懈怠，但您發現喪事的開支仍然像流水一樣，遠遠超過了預算。您深知，這必然是有人在帳目上動了手腳。您密派心腹平兒暗中查訪，比對了幾家外頭的物價，最終鎖定了負責採購儀仗物資的**吳新福家的**。她膽大妄為，證據確鑿地顯示她已在多項物料上貪墨了近**一百五十兩銀子**，這幾乎是府庫撥款的一成半。您現在握著的，不僅是銀子，更是立功和拿捏人心的籌碼。',
+                dialogue: '**平兒（密報，聲音極低）：** 「奶奶，這吳新福家的心真大！她連買紙馬和香燭的錢都敢動手，報價足足高了三成，簡直是把寧府當作自己的錢莊了。奴婢已經將她做假帳的證據謄寫了一份，銀子也追回來了大部分，此刻還妥善收在房中。奶奶看，是要發賣了她，還是讓她吐出更多把柄？」',
+                // S3 圖片：已更新
+                image: 'https://i.postimg.cc/KvRP0MXN/dreamina-2025-10-03-8276.jpg',
+                choices: [
+                    {
+                        label: '【斬草除根】立刻傳喚，嚴刑拷打追回贓款（+150兩），將她夫婦發賣逐出賈府。',
+                        nextScene: 'S4_Jia_Rong',
+                        effects: { reputation: { 威懾力: 15, 賈珍滿意度: -10 }, resources: { 府庫銀兩: 150, 時間: -5 } }
+                    },
+                    {
+                        label: '【敲山震虎】私下召見，要求退還大部分銀兩（+100兩），調離要職，留人情。',
+                        nextScene: 'S4_Jia_Rong',
+                        effects: { reputation: { 威懾力: 5, 賈珍滿意度: 5 }, resources: { 府庫銀兩: 100, 時間: -2 } }
+                    },
+                    {
+                        label: '【釜底抽薪】暫時不動，讓她繼續採購，但暗中紀錄證據，準備一網打盡。',
+                        nextScene: 'S4_Jia_Rong',
+                        effects: { reputation: { 威懾力: 0, 賈珍滿意度: 0 }, resources: { 府庫銀兩: -50, 時間: -1 } }
+                    },
+                ]
+            },
+            'S4_Jia_Rong': {
+                narrative: '您對貪污的果斷處理，猶如一柄鋼刀刺入了寧國府的舊疾。賈蓉，作為寧府年輕一代的主子，被您發賣奴僕的舉動徹底激怒。他帶著滿臉的桀驁不馴，公然來質問您，仗著他與您是親戚、他是主子的身份，對您施加壓力，試圖逼您收回成命。他的語氣中帶著對您插手寧府事務的不滿與輕視，顯然是想讓您知難而退，別管得太寬，他背後或許還有賈珍的默許。',
+                dialogue: '**賈蓉（語氣不滿，帶著幾分挑釁）：** 「二嬸嬸，妳這辦事，也太絕情了些！他們再怎麼說也是寧國府的老人，跟著我父親這麼多年，妳這一下子就發賣了，叫我爹臉面何存？給他添了多大的亂子，您可知道？如今喪事還沒完，妳把底下的人都嚇得戰戰兢兢，誰還敢辦事？我勸嬸嬸收回成命，免得日後不好看，畢竟咱們都是一家人，凡事留一線。」',
+                // S4 圖片：已更新為賈蓉來犯場景圖
+                image: 'https://i.postimg.cc/9FrdL73P/dreamina-2025-10-03-8555.jpg',
+                choices: [
+                    {
+                        label: '【以禮壓人】嚴肅地引用賈母和王夫人的命令，強調自己是奉命行事，不容質疑。',
+                        nextScene: 'S5_The_Relative',
+                        effects: { reputation: { 威懾力: 10, 榮府評價: 5, 賈珍滿意度: 0 }, resources: { 時間: -1 } }
+                    },
+                    {
+                        label: '【剛柔並濟】先給面子，後私下暗示他知道秦可卿與賈珍的「不當關係」，以秘密震懾他。',
+                        nextScene: 'S5_The_Relative',
+                        effects: { reputation: { 威懾力: 10, 賈珍滿意度: 15 }, status: { 寧府把柄: 1 }, resources: { 時間: -2 } }
+                    },
+                    {
+                        label: '【直接訓斥】仗著輩分和身份，當眾厲聲訓斥賈蓉不懂規矩，呵斥他退下。',
+                        nextScene: 'S5_The_Relative',
+                        effects: { reputation: { 威懾力: 20, 賈珍滿意度: -20 }, resources: { 時間: 0 } }
+                    },
+                ]
+            },
+            'S5_The_Relative': {
+                narrative: '喪事已過大半，您連日操勞，心力交瘁。此時，榮國府的王夫人派人送來口信，讓您務必好好接待一位極愛面子的遠房親戚——城外周老爺。這位老爺是個極愛面子的勢利眼，此行目的就是想在賈府的喪事上露露臉，結識高官貴人，為自己謀個差事。王夫人雖然對他無感，但更怕他回去後四處抱怨，壞了榮府體面。您深知，接待這位閒雜人等，既浪費時間，又損耗精力，但這關係到您在榮府的評價，以及王夫人的臉面，您必須謹慎處理。',
+                dialogue: '**王夫人心腹（傳話，小心翼翼）：** 「鳳姑娘，太太（王夫人）特意叮囑，這位周老爺人極愛面子，他回去後必然要誇耀這段經歷，所以妳務必要**體面周全**地接待，讓他覺得受了極大的尊重，不可有絲毫怠慢，以免有失太太的顏面！他若不滿意，太太那邊也難交代。」',
+                // S5 圖片：已更新為周老爺接待場景圖
+                image: 'https://i.postimg.cc/qRsbMCBn/dreamina-2025-10-03-7500.jpg',
+                choices: [
+                    {
+                        label: '【高效打發】指派平兒出面，包個大紅包（-50兩），快速打發走，不浪費自己的時間。',
+                        nextScene: 'S6_Final_Payoff',
+                        effects: { reputation: { 榮府評價: -5 }, resources: { 府庫銀兩: -50, 時間: -1 } }
+                    },
+                    {
+                        label: '【隆重接待】親自出面，花半天時間與他聊天，讓賈蓉作陪，並準備厚禮（-100兩），做足面子。',
+                        nextScene: 'S6_Final_Payoff',
+                        effects: { reputation: { 榮府評價: 20 }, resources: { 府庫銀兩: -100, 時間: -5 } }
+                    },
+                    {
+                        label: '【冷處理】只讓一個粗使僕婦接待，說自己事務繁忙無法見客，根本不給他面子。',
+                        nextScene: 'S6_Final_Payoff',
+                        effects: { reputation: { 榮府評價: -15, 賈珍滿意度: -5 }, resources: { 府庫銀兩: 0, 時間: 0 } }
+                    },
+                ]
+            },
+            'S6_Final_Payoff': {
+                narrative: '經過四十五天的運籌帷幄，秦可卿的喪事終於圓滿落幕。您不僅辦得比榮府更體面，且在極短時間內整頓了積弊，效率驚人。賈珍專程設宴款待您，並親自來向您結算報酬，語氣充滿了如釋重負的感激與敬畏。您的辛勞費是定額的**三百兩**銀子。然而，您手中還掌握著一筆從帳目中清點出來的**結餘銀兩**，以及先前讓賈蓉噤聲的寧國府**驚天把柄**。現在，是您收割權力與財富果實的最後一刻。',
+                dialogue: '**賈珍（誠懇，略帶奉承）：** 「多虧了璉二弟妹！這四十五天真是辛苦妳了，辦得極有體面，連皇上都賞了恩典！這是按規矩給妳的**三百兩**銀子的辛苦費，妳務必要收下！至於府庫的帳，妳看如何結算，但憑妳做主。我賈珍對妳只有一個『服』字！」\n\n**您的目標是最大化個人利益。**',
+                // S6 圖片：已更新為結算場景圖
+                image: 'https://i.postimg.cc/JhcZs3JL/dreamina-2025-10-04-8421.jpg',
+                choices: [] // 選擇將由 getSceneChoices 動態生成
+            },
+            // --- 結局 ---
+            'E1_Good_Reputation': {
+                narrative: '您將所有結餘銀兩上交，表現出不貪圖小利的高尚品格。賈珍對您的敬重化為實質的讚譽，他向榮國府老太太和王夫人上稟時，極力稱讚您的清廉高效。您不僅辦事體面，還能結算清楚，分文不取，這在**賈府**上下掀起了巨大的波瀾。您的名字成為了「**公正嚴明**」的代名詞，那些先前觀望的奴才徹底收起了輕視之心。榮國府的主子對您更加倚重，將您視為家族的擎天柱。雖然您這次個人收入不多，但您獲得了比金銀更珍貴的**無形資產**：**信任**。這種信任將為您未來的權力之路鋪平道路，確保您在任何風波中都能得到堅實的支持。您知道，在賈府這樣的大家族裡，名聲有時比財富更有價值。',
+                dialogue: '您獲得了**「德才兼備」**的讚譽。\n\n**王熙鳳（總結與分析）：** 「這次雖然沒賺到大錢，但贏得**賈母**和**太太**的徹底信任，才是萬全之策。這三百兩是辛苦錢，那些結餘若吞下，日後就是把柄。我鳳姐要的是長遠的權勢，不是眼前的蠅頭小利。這份清名，讓我在榮府地位穩固如山，寧府也再無話可說。這是**以名易權**的頂級手腕。」\n\n**個人總財富：** 300兩',
+                // 圖片已更新為新的「德才兼備」圖
+                image: 'https://i.postimg.cc/GhHFXy05/dreamina-2025-10-04-4753.jpg',
+                choices: []
+            },
+            'E2_Great_Profit': {
+                narrative: '', // 動態內容
+                dialogue: '', // 動態內容
+                // 圖片已更新
+                image: 'https://i.postimg.cc/DzdLSQsF/dreamina-2025-10-04-8800.jpg',
+                choices: []
+            },
+            'E3_Ultimate_Power': {
+                narrative: '', // 動態內容
+                dialogue: '', // 動態內容
+                // 圖片為預設的成功圖 (若失敗，將在 getSceneContent 中被覆蓋)
+                image: 'https://i.postimg.cc/28VQ0ZRR/dreamina-2025-10-04-5420.jpg',
+                choices: []
+            },
+        };
+
+        /**
+         * 遊戲啟動函數
+         */
+        function startGame() {
+            initializeGameState();
+            loadScene('S1_Start');
+        }
+
+        // 啟動遊戲
+        startGame();
+
+    </script>
+</body>
+</html>
